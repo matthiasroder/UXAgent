@@ -1,39 +1,22 @@
 # UXAgent
 
-UXAgent is a reusable toolkit for AI-based simulated user panels for browser-based user experience testing.
+UXAgent runs simulated UX test panels against real browser pages and turns the sessions into evidence you can review.
 
-The goal is to run realistic, recorded interactions between simulated personas and a live website or application, then use the resulting evidence to critique the interface. The current implementation is a local MVP: it provides a TypeScript CLI, Playwright Chromium browser execution, a deterministic offline demo user agent, separated reviewer logic, sample fixture content, and automated tests.
+Give it a website, a panel of personas, and a set of tasks. UXAgent opens the page in Chromium, lets each simulated user attempt the task, captures the trace, and writes a reviewer report with outcomes, evidence, severity, affected journeys, and suggested fixes.
 
-## What We Want To Build
+It is built for teams that want a fast UX red-team pass before or after design changes: not a replacement for real user research, but a practical way to surface friction, compare flows, and keep interface critiques grounded in browser evidence.
 
-UXAgent should let a project team define a panel of plausible users, assign them realistic tasks, let them interact with the actual rendered site in a browser, and produce reviewable evidence.
+## What It Does
 
-The intended workflow:
+- Runs persona x task panels from a JSON config.
+- Uses a real rendered browser through Playwright Chromium.
+- Captures screenshots, action logs, metadata, outcomes, and think-aloud notes for every session.
+- Separates the simulated user from the reviewer, so interaction evidence and critique stay distinct.
+- Produces per-session reviews plus an aggregate report across the panel.
+- Runs locally in deterministic `demo` mode without LLM credentials.
+- Supports optional Playwright video recording with `limits.recordVideo`.
 
-1. Define target personas for a project.
-2. Define task scenarios for those personas.
-3. Open the current website or app in a real browser session.
-4. Let each simulated user interact through visible UI actions: mouse movement, clicks, typing, scrolling, waiting, and back/forward navigation.
-5. Record each session as a video or screencast.
-6. Save screenshots, action logs, task outcomes, and persona-specific think-aloud notes.
-7. Run a separate reviewer agent over the recording and trace.
-8. Produce a UX critique with evidence, severity, affected journeys, and suggested fixes.
-
-## Current MVP
-
-The MVP implements the workflow locally with:
-
-- JSON run configuration for target URL, run name, optional run ID, personas, tasks, limits, and reviewer settings.
-- Real browser execution through Playwright Chromium.
-- Deterministic `demo` mode that does not require paid LLM credentials.
-- Separate simulated user and reviewer contracts in `src/agents/contracts.ts`.
-- Per-session screenshots, action logs, metadata, outcomes, think-aloud notes, and reviews.
-- Aggregate JSON and Markdown reports across persona/task sessions.
-- A fixture publisher page and sample panel config.
-
-`live` mode is intentionally not implemented yet. It is reserved for a future LLM/browser-agent adapter.
-
-## Setup
+## Quick Start
 
 ```bash
 npm install
@@ -42,17 +25,19 @@ npm run build
 npm test
 ```
 
-## Run The Demo
-
-The checked-in sample config uses `${CONFIG_DIR}` so it can resolve the fixture relative to `examples/publisher-panel.json`:
+Run the bundled publisher demo:
 
 ```bash
 npm run uxagent -- --config examples/publisher-panel.json --out runs/demo
 ```
 
-For your own configs, use an absolute `http(s)://` URL, a `file://` URL, or `${CONFIG_DIR}/relative/path.html` for a file path relative to the config file.
+Open the generated report:
 
-## Config Shape
+```bash
+open runs/demo/publisher-demo/aggregate-report.md
+```
+
+## Example Panel
 
 ```json
 {
@@ -70,16 +55,16 @@ For your own configs, use an absolute `http(s)://` URL, a `file://` URL, or `${C
     {
       "id": "newsletter_prospect",
       "name": "Newsletter Prospect",
-      "profile": "Interested in events and essays.",
+      "profile": "Interested in events and essays but not ready to buy today.",
       "goals": ["Subscribe for updates"],
-      "constraints": ["Needs a visible signup path"]
+      "constraints": ["Needs a visible, low-friction signup path"]
     }
   ],
   "tasks": [
     {
       "id": "join_newsletter",
       "title": "Join the newsletter",
-      "description": "Subscribe with an email address.",
+      "description": "Subscribe to the publisher newsletter with an email address.",
       "successCriteria": ["A newsletter confirmation is visible"]
     }
   ],
@@ -89,65 +74,111 @@ For your own configs, use an absolute `http(s)://` URL, a `file://` URL, or `${C
 }
 ```
 
-`task.startPath` may be used with HTTP(S) targets and must resolve to the same origin as `targetUrl`. It is rejected for `file://` targets in this MVP to avoid local path ambiguity.
+`targetUrl` can be:
 
-In `demo` mode, UXAgent only clicks or types on local targets: `file://`, `localhost`, `127.0.0.1`, or `::1`. For non-local HTTP(S) targets, it captures observation evidence without active interaction.
+- an absolute `http://` or `https://` URL
+- a `file://` URL
+- a `${CONFIG_DIR}/relative/path.html` file path resolved relative to the config file
 
-## Artifacts
+`task.startPath` is available for HTTP(S) targets and must stay on the same origin as `targetUrl`. It is rejected for `file://` targets to avoid local filesystem ambiguity.
 
-Each run writes to `<out>/<safeRunId-or-runName>/`:
+## Output
 
-- `run-metadata.json`
-- `sessions/<personaId>__<taskId>/metadata.json`
-- `sessions/<personaId>__<taskId>/actions.json`
-- `sessions/<personaId>__<taskId>/screenshots/*.png`
-- `sessions/<personaId>__<taskId>/outcome.json`
-- `sessions/<personaId>__<taskId>/think-aloud.md`
-- `sessions/<personaId>__<taskId>/review.json`
-- `sessions/<personaId>__<taskId>/review.md`
-- optional `sessions/<personaId>__<taskId>/video.webm`
-- `aggregate-report.json`
-- `aggregate-report.md`
+Each run writes to `<out>/<safeRunId-or-runName>/`.
 
-Screenshots, logs, and outcomes are the reliable minimum artifacts. Video is best-effort and depends on Playwright browser support and `limits.recordVideo`.
+```text
+runs/demo/publisher-demo/
+  run-metadata.json
+  aggregate-report.md
+  aggregate-report.json
+  sessions/
+    newsletter_prospect__join_newsletter/
+      metadata.json
+      actions.json
+      outcome.json
+      think-aloud.md
+      review.md
+      review.json
+      screenshots/
+        initial.png
+        step-1-observe.png
+        step-2-type.png
+        step-3-click.png
+        final.png
+      video.webm        # only when recordVideo is enabled and available
+```
 
-## Design Principles
+The Markdown files are meant for humans. The JSON files are stable enough for scripts, regression comparisons, and future dashboards.
 
-- Use the real rendered browser, not a static DOM snapshot.
-- Prefer screenshot-visible interaction over perfect selector-based automation.
-- Keep the simulated user and reviewer roles separate.
-- Treat synthetic users as a UX red-team and hypothesis generator, not a replacement for real user research.
-- Make runs reproducible enough to compare before and after design changes.
-- Keep the tool reusable across websites, not hard-coded to a single client project.
+## Evidence Model
 
-## Intended Outputs
+UXAgent treats screenshots and logs as the reliable baseline. They are always captured, easy to inspect, and straightforward to test.
 
-Each simulated test run should produce:
+Video is optional:
 
-- `video.webm` or equivalent screencast
-- screenshot sequence
-- action log
-- persona and task metadata
-- final task outcome
-- simulated think-aloud notes
-- reviewer critique
-- aggregate report across personas and tasks
+```json
+{
+  "limits": {
+    "recordVideo": true
+  }
+}
+```
 
-## Initial Use Case
+When video recording is enabled, UXAgent asks Playwright to save `video.webm`. If local browser video support fails, the run still preserves the core evidence: screenshots, actions, outcomes, think-aloud notes, and reports.
 
-The first motivating use case is UX testing for a publisher website relaunch. Example simulated users may include literary readers, architecture-book buyers, event visitors, newsletter prospects, gift buyers, and internal editors.
+## Demo Mode Safety
 
-The reusable version should support any website where task-based user journeys can be described clearly.
+`demo` mode is deterministic and credential-free. It actively clicks and types only on local targets:
+
+- `file://`
+- `localhost`
+- `127.0.0.1`
+- `::1`
+
+For non-local HTTP(S) targets, UXAgent captures observation evidence without active interaction. For local pages, it also blocks non-local HTTP(S) requests after initial navigation so a fixture cannot accidentally submit data to an external service.
+
+## CLI
+
+```bash
+npm run uxagent -- --config <config.json> --out <output-dir>
+```
+
+Options:
+
+- `--config`, `-c`: JSON run configuration
+- `--out`, `-o`: output directory, defaults to `runs`
+- `--help`, `-h`: show help
+
+## Configuration Reference
+
+Top-level fields:
+
+- `runName`: human-readable run name
+- `runId`: optional stable ID for reproducible output paths
+- `targetUrl`: page URL or `${CONFIG_DIR}` file path
+- `mode`: `demo` or `live`; `live` is reserved and currently fails clearly
+- `limits.maxSteps`: maximum simulated-user steps per task
+- `limits.actionDelayMs`: delay between actions
+- `limits.navigationTimeoutMs`: browser navigation timeout
+- `limits.recordVideo`: enable optional Playwright video
+- `personas`: one or more simulated users
+- `tasks`: one or more task scenarios
+- `reviewer.minSeverity`: filters displayed Markdown findings; JSON reports keep the full structure
+
+Persona and task IDs are validated and normalized for filesystem-safe artifact paths. IDs that would collide after normalization are rejected.
+
+## Current Boundaries
+
+UXAgent is usable today as a local evidence harness and deterministic demo runner. It does not yet include a live LLM browser-agent adapter.
+
+That boundary is intentional. The package already defines separate user and reviewer contracts, so future live adapters can be added without mixing browser interaction, evidence capture, and critique logic.
+
+The deterministic demo user is simple by design. It is good for validating the harness, comparing fixture flows, and producing reviewable artifacts. It should not be mistaken for broad autonomous UX research coverage.
 
 ## Research Anchor
 
-This idea is informed by the UXAgent research paper:
+UXAgent is informed by:
 
 - [UXAgent: A System for Simulating Usability Testing of Web Design with LLM Agents](docs/references/uxagent-paper.md)
 
-## Limitations
-
-- The demo user agent is deterministic and deliberately simple. It is useful for validating the harness and producing comparable local runs, not for claiming human-level research coverage.
-- Arbitrary websites may produce failed outcomes when the demo strategy cannot identify a task path. That is intentional; the MVP should not fabricate success.
-- Live LLM/browser-agent integration is behind the role contracts and remains out of scope until a provider adapter is explicitly chosen.
-- UXAgent is a UX red-team and hypothesis generator, not a replacement for real user research.
+This repository is a separate implementation focused on a reusable local toolkit.
