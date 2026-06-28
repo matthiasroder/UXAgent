@@ -1,0 +1,45 @@
+{
+  "runName": "Publisher Relaunch Demo",
+  "runId": "publisher-demo",
+  "targetUrl": "${CONFIG_DIR}/fixtures/publisher.html",
+  "mode": "demo",
+  "limits": {
+    "maxSteps": 8,
+    "actionDelayMs": 0,
+    "navigationTimeoutMs": 30000,
+    "recordVideo": false
+  },
+  "personas": [
+    {
+      "id": "literary_reader",
+      "name": "Literary Reader",
+      "profile": "Browses new fiction releases and wants confidence that a title is worth buying.",
+      "goals": ["Find a promising book quickly"],
+      "constraints": ["Avoid confusing checkout flows"]
+    },
+    {
+      "id": "newsletter_prospect",
+      "name": "Newsletter Prospect",
+      "profile": "Interested in events and essays but not ready to buy today.",
+      "goals": ["Subscribe for updates"],
+      "constraints": ["Needs a visible privacy-safe signup path"]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "buy_book",
+      "title": "Buy an architecture book",
+      "description": "Find the featured architecture book and add it to the cart.",
+      "successCriteria": ["A cart or checkout confirmation is visible"]
+    },
+    {
+      "id": "join_newsletter",
+      "title": "Join the newsletter",
+      "description": "Subscribe to the publisher newsletter with an email address.",
+      "successCriteria": ["A newsletter confirmation is visible"]
+    }
+  ],
+  "reviewer": {
+    "minSeverity": "low"
+  }
+}

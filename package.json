@@ -1,0 +1,35 @@
+{
+  "name": "uxagent",
+  "version": "1.0.0",
+  "description": "UXAgent is a planned reusable toolkit for AI-based simulated user panels for browser-based user experience testing.",
+  "type": "module",
+  "bin": {
+    "uxagent": "./src/cli.ts"
+  },
+  "scripts": {
+    "uxagent": "tsx src/cli.ts",
+    "build": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matthiasroder/UXAgent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/matthiasroder/UXAgent/issues"
+  },
+  "homepage": "https://github.com/matthiasroder/UXAgent#readme",
+  "dependencies": {
+    "playwright": "^1.61.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

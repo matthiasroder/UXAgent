@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Northline Books</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #17202a;
+        background: #fbfaf7;
+      }
+
+      header,
+      main,
+      footer {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      nav {
+        display: flex;
+        gap: 16px;
+      }
+
+      a,
+      button {
+        font: inherit;
+      }
+
+      .hero {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 380px);
+        align-items: center;
+        padding: 40px 0;
+      }
+
+      .book,
+      .newsletter,
+      .events {
+        border-top: 1px solid #d7d1c7;
+        padding: 28px 0;
+      }
+
+      button {
+        min-height: 40px;
+        border: 0;
+        padding: 0 16px;
+        background: #234f68;
+        color: white;
+        cursor: pointer;
+      }
+
+      input {
+        min-height: 38px;
+        padding: 0 10px;
+        border: 1px solid #a8a096;
+      }
+
+      #cart-status,
+      #newsletter-status {
+        margin-top: 12px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Northline Books</h1>
+      <nav aria-label="Main navigation">
+        <a href="#featured">Featured books</a>
+        <a href="#events">Events</a>
+        <a href="#newsletter">Newsletter</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <div>
+          <h2>Independent books for design-minded readers</h2>
+          <p>Architecture, essays, and literary fiction selected by editors.</p>
+        </div>
+        <aside>
+          <h3>Tonight</h3>
+          <p>Architecture and Memory, author talk at 19:00.</p>
+          <a href="#events">View event details</a>
+        </aside>
+      </section>
+
+      <section id="featured" class="book">
+        <h2>Featured architecture book</h2>
+        <p><strong>Concrete Gardens</strong> explores civic landscapes and postwar housing.</p>
+        <button id="buy-book" type="button">Buy book</button>
+        <p id="cart-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section id="events" class="events">
+        <h2>Upcoming event</h2>
+        <p>Architecture and Memory is on Friday at 19:00 in the main hall.</p>
+        <a href="#tickets">Event ticket details</a>
+      </section>
+
+      <section id="newsletter" class="newsletter">
+        <h2>Newsletter</h2>
+        <p>Monthly essays, events, and new releases.</p>
+        <label>
+          Email
+          <input id="email" name="email" type="email" autocomplete="email" />
+        </label>
+        <button id="subscribe" type="button">Subscribe</button>
+        <p id="newsletter-status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <footer>
+      <p>Northline Books demo fixture.</p>
+    </footer>
+    <script>
+      document.querySelector("#buy-book").addEventListener("click", () => {
+        document.querySelector("#cart-status").textContent = "Added to cart. Checkout is ready.";
+      });
+      document.querySelector("#subscribe").addEventListener("click", () => {
+        document.querySelector("#newsletter-status").textContent = "Thanks, you are subscribed.";
+      });
+    </script>
+  </body>
+</html>
