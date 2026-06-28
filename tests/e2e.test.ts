@@ -3,6 +3,7 @@ import http from "node:http";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runUxAgent } from "../src/runner.js";
+import type { LiveActionPrompt, LiveModelClient } from "../src/agents/live/modelClient.js";
 import { tempDir, writeConfig } from "./helpers.js";
 
 let server: http.Server;
@@ -89,6 +90,114 @@ describe("local demo run", () => {
     await expect(fs.access(path.join(sessionDir, "review.md"))).resolves.toBeUndefined();
     expect(aggregate.taskMatrix).toHaveLength(1);
     expect(aggregate.findings).toHaveLength(1);
+  });
+
+  it("runs live mode with a fake model client and writes normal artifacts", async () => {
+    const dir = await tempDir("uxagent-live-e2e-");
+    const origin = new URL(baseUrl).origin;
+    const configPath = await writeConfig(dir, {
+      runName: "Live Fixture",
+      runId: "live-fixture",
+      targetUrl: baseUrl,
+      mode: "live",
+      limits: {
+        maxSteps: 4,
+        recordVideo: false,
+      },
+      live: {
+        allowedOrigins: [origin],
+        includeScreenshots: false,
+        testData: {
+          email: "uxagent-test@example.com",
+        },
+      },
+      personas: [
+        {
+          id: "event_visitor",
+          name: "Event Visitor",
+          profile: "Looks for event details.",
+        },
+      ],
+      tasks: [
+        {
+          id: "find_event",
+          title: "Find event details",
+          description: "Open event details and finish when the event path is visible.",
+        },
+      ],
+    });
+    const modelClient: LiveModelClient = {
+      async chooseAction(prompt: LiveActionPrompt) {
+        const alreadyTyped = prompt.recentActions.some((action) => action.type === "type");
+        const alreadyClicked = prompt.recentActions.some((action) => action.type === "click");
+        if (alreadyTyped && alreadyClicked) {
+          return {
+            action: "finish",
+            reason: "Event details path was opened.",
+            summary: "The live agent opened the event details path.",
+          };
+        }
+        if (!alreadyTyped) {
+          const emailTarget = prompt.page.elements.find((element) => element.isInput && /email/i.test(`${element.label ?? ""} ${element.placeholder ?? ""}`));
+          return {
+            action: "type",
+            targetId: emailTarget?.id,
+            valueKey: "email",
+            reason: "Use configured test email before exploring.",
+          };
+        }
+        const target = prompt.page.elements.find((element) => /event details/i.test(`${element.text} ${element.label ?? ""}`));
+        return {
+          action: "click",
+          targetId: target?.id,
+          reason: "The event details link matches the task.",
+        };
+      },
+    };
+
+    const result = await runUxAgent({ configPath, outDir: path.join(dir, "runs"), liveModelClient: modelClient });
+    const sessionDir = path.join(dir, "runs", "live-fixture", "sessions", "event_visitor__find_event");
+    const outcome = JSON.parse(await fs.readFile(path.join(sessionDir, "outcome.json"), "utf8")) as { status: string; summary: string };
+    const actions = JSON.parse(await fs.readFile(path.join(sessionDir, "actions.json"), "utf8")) as Array<{ type: string; value?: string }>;
+
+    expect(result.exitCode).toBe(0);
+    expect(outcome.status).toBe("passed");
+    expect(outcome.summary).toMatch(/event/i);
+    expect(actions.map((action) => action.type)).toContain("click");
+    expect(actions.find((action) => action.type === "type")?.value).toBe("uxagent-test@example.com");
+    await expect(fs.access(path.join(sessionDir, "review.md"))).resolves.toBeUndefined();
+  });
+
+  it("fails live mode before browser work when OpenAI key env is missing", async () => {
+    const dir = await tempDir("uxagent-live-key-");
+    const origin = new URL(baseUrl).origin;
+    const configPath = await writeConfig(dir, {
+      runName: "Missing Key",
+      runId: "missing-key",
+      targetUrl: baseUrl,
+      mode: "live",
+      live: {
+        apiKeyEnv: "UXAGENT_TEST_MISSING_OPENAI_KEY",
+        allowedOrigins: [origin],
+      },
+      personas: [
+        {
+          id: "reader",
+          name: "Reader",
+          profile: "Profile.",
+        },
+      ],
+      tasks: [
+        {
+          id: "task",
+          title: "Task",
+          description: "Task.",
+        },
+      ],
+    });
+
+    await expect(runUxAgent({ configPath, outDir: path.join(dir, "runs") })).rejects.toThrow(/UXAGENT_TEST_MISSING_OPENAI_KEY/);
+    await expect(fs.access(path.join(dir, "runs", "missing-key"))).rejects.toThrow();
   });
 
   it("respects maxSteps before clicking or typing", async () => {

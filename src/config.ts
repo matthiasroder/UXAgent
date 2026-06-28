@@ -57,6 +57,27 @@ const configSchema = z.object({
       minSeverity: z.enum(["low", "medium", "high"]).default("low"),
     }),
   ),
+  live: z
+    .object({
+      provider: z.enum(["openai"]).default("openai"),
+      model: z.string().min(1).default("gpt-5.5"),
+      apiKeyEnv: z.string().min(1).default("OPENAI_API_KEY"),
+      allowedOrigins: z.array(z.string().url()).min(1),
+      includeScreenshots: z.boolean().default(true),
+      maxActionRepairs: z.number().int().min(0).max(3).default(1),
+      permissions: z.preprocess(
+        (value) => value ?? {},
+        z.object({
+          allowClicks: z.boolean().default(true),
+          allowTyping: z.boolean().default(true),
+          allowFormSubmit: z.boolean().default(false),
+          allowExternalNavigation: z.boolean().default(false),
+          allowDestructiveClicks: z.boolean().default(false),
+        }),
+      ),
+      testData: z.record(z.string(), z.string()).default({}),
+    })
+    .optional(),
 });
 
 export class ConfigError extends Error {
@@ -89,6 +110,7 @@ export async function loadConfig(configPath: string): Promise<UXAgentConfig> {
 function validateAndResolveConfig(config: UXAgentConfig): UXAgentConfig {
   validateSafeIdSet("personas", config.personas.map((persona) => persona.id));
   validateSafeIdSet("tasks", config.tasks.map((task) => task.id));
+  validateLiveConfig(config);
 
   const base = new URL(config.targetUrl);
   const tasks = config.tasks.map((task) => {
@@ -113,6 +135,43 @@ function validateAndResolveConfig(config: UXAgentConfig): UXAgentConfig {
   });
 
   return { ...config, tasks };
+}
+
+function validateLiveConfig(config: UXAgentConfig): void {
+  if (config.mode !== "live") {
+    return;
+  }
+
+  if (!config.live) {
+    throw new ConfigError("mode live requires a live configuration block.");
+  }
+
+  const targetProtocol = new URL(config.targetUrl).protocol;
+  if (targetProtocol !== "http:" && targetProtocol !== "https:") {
+    throw new ConfigError("mode live requires an http(s) targetUrl. Use demo mode for file:// fixtures.");
+  }
+
+  const targetOrigin = originOf(config.targetUrl);
+  const allowedOrigins = config.live.allowedOrigins.map((origin) => normalizeOrigin(origin));
+  if (!allowedOrigins.includes(targetOrigin)) {
+    throw new ConfigError(`live.allowedOrigins must include targetUrl origin ${targetOrigin}.`);
+  }
+}
+
+function originOf(value: string): string {
+  const url = new URL(value);
+  if (url.protocol === "file:") {
+    return "file://";
+  }
+  return url.origin;
+}
+
+function normalizeOrigin(value: string): string {
+  const url = new URL(value);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new ConfigError("live.allowedOrigins must use http(s) origins.");
+  }
+  return url.origin;
 }
 
 function validateSafeIdSet(label: string, ids: string[]): void {

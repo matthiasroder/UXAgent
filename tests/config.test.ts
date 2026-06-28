@@ -168,11 +168,78 @@ describe("config validation", () => {
     await expect(loadConfig(configPath)).rejects.toThrow(/reserved for session paths/);
   });
 
-  it("rejects unsupported live mode at runner boundary", async () => {
+  it("requires live config when mode is live", async () => {
     const dir = await tempDir("uxagent-live-");
     const configPath = await writeConfig(dir, baseConfig({ mode: "live" }));
-    const { runUxAgent } = await import("../src/runner.js");
 
-    await expect(runUxAgent({ configPath, outDir: dir })).rejects.toThrow(/not implemented/);
+    await expect(loadConfig(configPath)).rejects.toThrow(/requires a live configuration/);
+  });
+
+  it("requires live allowedOrigins to include the target origin", async () => {
+    const dir = await tempDir("uxagent-live-");
+    const configPath = await writeConfig(
+      dir,
+      baseConfig({
+        mode: "live",
+        targetUrl: "https://example.test/",
+        live: {
+          allowedOrigins: ["https://other.test"],
+        },
+      }),
+    );
+
+    await expect(loadConfig(configPath)).rejects.toThrow(/allowedOrigins/);
+  });
+
+  it("applies live defaults", async () => {
+    const dir = await tempDir("uxagent-live-");
+    const configPath = await writeConfig(
+      dir,
+      baseConfig({
+        mode: "live",
+        targetUrl: "https://example.test/",
+        live: {
+          allowedOrigins: ["https://example.test"],
+        },
+      }),
+    );
+
+    const config = await loadConfig(configPath);
+
+    expect(config.live?.provider).toBe("openai");
+    expect(config.live?.apiKeyEnv).toBe("OPENAI_API_KEY");
+    expect(config.live?.permissions.allowFormSubmit).toBe(false);
+  });
+
+  it("rejects file targets in live mode", async () => {
+    const dir = await tempDir("uxagent-live-file-");
+    const configPath = await writeConfig(
+      dir,
+      baseConfig({
+        mode: "live",
+        targetUrl: "file:///tmp/page.html",
+        live: {
+          allowedOrigins: ["file:///tmp/page.html"],
+        },
+      }),
+    );
+
+    await expect(loadConfig(configPath)).rejects.toThrow(/http\(s\) targetUrl/);
+  });
+
+  it("rejects non-http allowed origins in live mode", async () => {
+    const dir = await tempDir("uxagent-live-origin-");
+    const configPath = await writeConfig(
+      dir,
+      baseConfig({
+        mode: "live",
+        targetUrl: "https://example.test/",
+        live: {
+          allowedOrigins: ["file:///tmp/page.html"],
+        },
+      }),
+    );
+
+    await expect(loadConfig(configPath)).rejects.toThrow(/http\(s\) origins/);
   });
 });

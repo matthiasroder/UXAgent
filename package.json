@@ -1,7 +1,7 @@
 {
   "name": "uxagent",
   "version": "1.0.0",
-  "description": "UXAgent is a planned reusable toolkit for AI-based simulated user panels for browser-based user experience testing.",
+  "description": "Local CLI toolkit for simulated UX test panels in real browser sessions, with evidence artifacts and reviewer reports.",
   "type": "module",
   "bin": {
     "uxagent": "./src/cli.ts"
@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/matthiasroder/UXAgent#readme",
   "dependencies": {
+    "openai": "^6.45.0",
     "playwright": "^1.61.1",
     "zod": "^4.4.3"
   },

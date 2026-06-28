@@ -1,6 +1,7 @@
 export type Severity = "low" | "medium" | "high";
 export type RunMode = "demo" | "live";
 export type TaskStatus = "passed" | "failed" | "error";
+export type LiveProvider = "openai";
 
 export interface PersonaConfig {
   id: string;
@@ -26,6 +27,25 @@ export interface ExecutionLimits {
   recordVideo: boolean;
 }
 
+export interface LivePermissions {
+  allowClicks: boolean;
+  allowTyping: boolean;
+  allowFormSubmit: boolean;
+  allowExternalNavigation: boolean;
+  allowDestructiveClicks: boolean;
+}
+
+export interface LiveConfig {
+  provider: LiveProvider;
+  model: string;
+  apiKeyEnv: string;
+  allowedOrigins: string[];
+  includeScreenshots: boolean;
+  maxActionRepairs: number;
+  permissions: LivePermissions;
+  testData: Record<string, string>;
+}
+
 export interface ReviewerConfig {
   minSeverity: Severity;
 }
@@ -39,6 +59,7 @@ export interface UXAgentConfig {
   personas: PersonaConfig[];
   tasks: TaskConfig[];
   reviewer: ReviewerConfig;
+  live?: LiveConfig;
 }
 
 export interface ActionLogEntry {
@@ -49,6 +70,42 @@ export interface ActionLogEntry {
   screenshot?: string;
   timestamp: string;
   note: string;
+}
+
+export interface LiveElementSnapshot {
+  id: string;
+  tagName: string;
+  role?: string;
+  text: string;
+  label?: string;
+  placeholder?: string;
+  type?: string;
+  href?: string;
+  visible: boolean;
+  enabled: boolean;
+  isInput: boolean;
+  isClickable: boolean;
+  isSubmit: boolean;
+  isDestructive: boolean;
+}
+
+export interface LivePageSnapshot {
+  url: string;
+  title: string;
+  bodyTextSample: string;
+  screenshotDataUrl?: string;
+  elements: LiveElementSnapshot[];
+}
+
+export type LiveActionName = "observe" | "click" | "type" | "scroll" | "wait" | "back" | "finish" | "fail";
+
+export interface LiveActionDecision {
+  action: LiveActionName;
+  targetId?: string;
+  valueKey?: string;
+  amount?: number;
+  reason: string;
+  summary?: string;
 }
 
 export interface TaskOutcome {

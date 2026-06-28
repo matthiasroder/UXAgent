@@ -1,0 +1,64 @@
+{
+  "runName": "The Mindshift Live Panel",
+  "runId": "themindshift-live",
+  "targetUrl": "https://themindshift.global",
+  "mode": "live",
+  "limits": {
+    "maxSteps": 8,
+    "actionDelayMs": 250,
+    "navigationTimeoutMs": 45000,
+    "recordVideo": false
+  },
+  "live": {
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "allowedOrigins": ["https://themindshift.global"],
+    "includeScreenshots": true,
+    "maxActionRepairs": 1,
+    "permissions": {
+      "allowClicks": true,
+      "allowTyping": true,
+      "allowFormSubmit": false,
+      "allowExternalNavigation": false,
+      "allowDestructiveClicks": false
+    },
+    "testData": {
+      "email": "uxagent-test@example.com",
+      "name": "UXAgent Test"
+    }
+  },
+  "personas": [
+    {
+      "id": "ld_leader",
+      "name": "L&D Leader",
+      "profile": "Owns leadership development and wants to understand whether The Mindshift can help managers lead through AI-driven change.",
+      "goals": ["Understand the offer quickly", "Find credibility signals"],
+      "constraints": ["Needs an enterprise-relevant path and clear next step"]
+    },
+    {
+      "id": "ceo_founder",
+      "name": "Founder CEO",
+      "profile": "Runs a growing company and wants practical help turning AI disruption into strategic advantage.",
+      "goals": ["Find a strategic promise", "Identify a path to start a conversation"],
+      "constraints": ["Will leave if the page feels abstract or consultant-generic"]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "understand_offer",
+      "title": "Understand the offer",
+      "description": "Use the site to understand what The Mindshift offers and who it is for.",
+      "successCriteria": ["The site communicates a clear audience, outcome, and next step"]
+    },
+    {
+      "id": "find_relationship_path",
+      "title": "Find a relationship path",
+      "description": "Find the most obvious next step to subscribe, contact, book, or otherwise start a relationship.",
+      "successCriteria": ["A safe next step is visible without submitting a form"]
+    }
+  ],
+  "reviewer": {
+    "minSeverity": "low"
+  }
+}

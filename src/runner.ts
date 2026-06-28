@@ -2,7 +2,10 @@ import path from "node:path";
 import { ensureDir, writeJson, writeText } from "./artifacts.js";
 import { EvidenceReviewer } from "./agents/reviewer.js";
 import { DemoUserAgent } from "./agents/demoUserAgent.js";
+import { LiveUserAgent } from "./agents/liveAgent.js";
 import { REVIEWER_CONTRACT, USER_AGENT_CONTRACT } from "./agents/contracts.js";
+import { OpenAIModelClient } from "./agents/live/openaiModelClient.js";
+import type { LiveModelClient } from "./agents/live/modelClient.js";
 import { loadConfig } from "./config.js";
 import { runRoot, sessionId } from "./ids.js";
 import { runSession } from "./browser/runSession.js";
@@ -11,6 +14,7 @@ import type { ActionLogEntry, PersonaConfig, SessionArtifact, SessionReview, Tas
 export interface RunOptions {
   configPath: string;
   outDir: string;
+  liveModelClient?: LiveModelClient;
 }
 
 export interface RunResult {
@@ -29,9 +33,10 @@ export class UnsupportedModeError extends Error {
 
 export async function runUxAgent(options: RunOptions): Promise<RunResult> {
   const config = await loadConfig(options.configPath);
-  if (config.mode === "live") {
-    throw new UnsupportedModeError(config.mode);
-  }
+  const userAgent =
+    config.mode === "live"
+      ? new LiveUserAgent(config.live!, options.liveModelClient ?? new OpenAIModelClient(config.live!))
+      : new DemoUserAgent();
 
   const runDir = runRoot(options.outDir, config.runName, config.runId);
   await ensureDir(runDir);
@@ -57,7 +62,6 @@ export async function runUxAgent(options: RunOptions): Promise<RunResult> {
     },
   });
 
-  const userAgent = new DemoUserAgent();
   const reviewer = new EvidenceReviewer();
   const reviews: SessionReview[] = [];
   let exitCode = 0;

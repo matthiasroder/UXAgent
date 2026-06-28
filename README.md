@@ -13,7 +13,8 @@ It is built for teams that want a fast UX red-team pass before or after design c
 - Captures screenshots, action logs, metadata, outcomes, and think-aloud notes for every session.
 - Separates the simulated user from the reviewer, so interaction evidence and critique stay distinct.
 - Produces per-session reviews plus an aggregate report across the panel.
-- Runs locally in deterministic `demo` mode without LLM credentials.
+- Runs deterministic local `demo` panels without LLM credentials.
+- Runs OpenAI-backed `live` panels with explicit origin and action permissions.
 - Supports optional Playwright video recording with `limits.recordVideo`.
 
 ## Quick Start
@@ -82,6 +83,62 @@ open runs/demo/publisher-demo/aggregate-report.md
 
 `task.startPath` is available for HTTP(S) targets and must stay on the same origin as `targetUrl`. It is rejected for `file://` targets to avoid local filesystem ambiguity.
 
+## Live Mode
+
+`live` mode uses an OpenAI-backed browser agent. The model sees the persona, task, visible page state, recent action history, available element IDs, and optional screenshot context. It can propose one action at a time, and UXAgent validates that action before Playwright executes anything.
+
+Set an API key:
+
+```bash
+export OPENAI_API_KEY=...
+```
+
+Run a live panel:
+
+```bash
+npm run uxagent -- --config examples/themindshift-live-panel.json --out runs/live
+```
+
+Live mode requires explicit `allowedOrigins`:
+
+```json
+{
+  "mode": "live",
+  "live": {
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "allowedOrigins": ["https://themindshift.global"],
+    "includeScreenshots": true,
+    "maxActionRepairs": 1,
+    "permissions": {
+      "allowClicks": true,
+      "allowTyping": true,
+      "allowFormSubmit": false,
+      "allowExternalNavigation": false,
+      "allowDestructiveClicks": false
+    },
+    "testData": {
+      "email": "uxagent-test@example.com",
+      "name": "UXAgent Test"
+    }
+  }
+}
+```
+
+The model can only choose from these actions:
+
+- `observe`
+- `click`
+- `type`
+- `scroll`
+- `wait`
+- `back`
+- `finish`
+- `fail`
+
+It does not get raw Playwright access. Clicks and typing are checked against the current page snapshot, the configured origin policy, and the configured permissions.
+
 ## Output
 
 Each run writes to `<out>/<safeRunId-or-runName>/`.
@@ -137,6 +194,24 @@ When video recording is enabled, UXAgent asks Playwright to save `video.webm`. I
 
 For non-local HTTP(S) targets, UXAgent captures observation evidence without active interaction. For local pages, it also blocks non-local HTTP(S) requests after initial navigation so a fixture cannot accidentally submit data to an external service.
 
+## Live Mode Safety
+
+Live mode is active, but bounded:
+
+- `allowedOrigins` is required and must include the target origin.
+- Live mode requires an HTTP(S) `targetUrl`; use `demo` for `file://` fixtures.
+- HTTP(S) requests outside `allowedOrigins` are always blocked.
+- Service workers are disabled in live browser contexts so request guards cannot be bypassed by cached handlers.
+- WebSocket traffic is mocked locally and does not connect to external servers.
+- Other non-HTTP(S) network channels are blocked except browser-internal `data:`, `blob:`, and `about:` URLs.
+- Same-origin `POST`/mutating requests are blocked while `allowFormSubmit` is false.
+- Cross-origin navigation among configured allowed origins requires `allowExternalNavigation`.
+- Form submission is disabled by default.
+- Destructive-looking clicks are disabled by default.
+- Typing can only use values from `live.testData`.
+- Missing API credentials fail before browser launch.
+- Blocked model actions are logged as evidence instead of being executed.
+
 ## CLI
 
 ```bash
@@ -156,7 +231,7 @@ Top-level fields:
 - `runName`: human-readable run name
 - `runId`: optional stable ID for reproducible output paths
 - `targetUrl`: page URL or `${CONFIG_DIR}` file path
-- `mode`: `demo` or `live`; `live` is reserved and currently fails clearly
+- `mode`: `demo` or `live`
 - `limits.maxSteps`: maximum simulated-user steps per task
 - `limits.actionDelayMs`: delay between actions
 - `limits.navigationTimeoutMs`: browser navigation timeout
@@ -164,16 +239,22 @@ Top-level fields:
 - `personas`: one or more simulated users
 - `tasks`: one or more task scenarios
 - `reviewer.minSeverity`: filters displayed Markdown findings; JSON reports keep the full structure
+- `live.provider`: currently `openai`
+- `live.model`: OpenAI model name
+- `live.apiKeyEnv`: environment variable used for the API key
+- `live.allowedOrigins`: origins where live mode may actively interact
+- `live.includeScreenshots`: include viewport screenshots in model prompts
+- `live.maxActionRepairs`: retry malformed model action output up to this many times
+- `live.permissions`: click, typing, form, navigation, and destructive-action controls
+- `live.testData`: named values the agent is allowed to type
 
 Persona and task IDs are validated and normalized for filesystem-safe artifact paths. IDs that would collide after normalization are rejected.
 
 ## Current Boundaries
 
-UXAgent is usable today as a local evidence harness and deterministic demo runner. It does not yet include a live LLM browser-agent adapter.
+UXAgent is usable today as a local evidence harness, deterministic demo runner, and OpenAI-backed live browser agent.
 
-That boundary is intentional. The package already defines separate user and reviewer contracts, so future live adapters can be added without mixing browser interaction, evidence capture, and critique logic.
-
-The deterministic demo user is simple by design. It is good for validating the harness, comparing fixture flows, and producing reviewable artifacts. It should not be mistaken for broad autonomous UX research coverage.
+The deterministic demo user is simple by design. It is good for validating the harness, comparing fixture flows, and producing reviewable artifacts. Live mode is more capable, but it is still a bounded synthetic UX red-team pass, not broad autonomous user research.
 
 ## Research Anchor
 

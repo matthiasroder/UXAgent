@@ -1,7 +1,8 @@
 import path from "node:path";
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type BrowserContextOptions, type Page } from "playwright";
 import { ensureDir, relativeArtifact, writeJson, writeText } from "../artifacts.js";
 import { isSafeInteractionUrl } from "../agents/demoUserAgent.js";
+import { createLivePolicy, shouldBlockHttpRequest, shouldBlockNetworkRequest } from "../safety/livePolicy.js";
 import { sessionId } from "../ids.js";
 import type { UserAgent } from "../agents/contracts.js";
 import type { ActionLogEntry, PersonaConfig, SessionArtifact, SessionMetadata, TaskConfig, TaskOutcome, UXAgentConfig } from "../types.js";
@@ -63,22 +64,14 @@ export async function runSession(input: RunSessionInput): Promise<SessionArtifac
 
   try {
     browser = await launchChromium();
-    context = await browser.newContext(
-      input.config.limits.recordVideo
-        ? {
-            recordVideo: {
-              dir: videoDir,
-            },
-          }
-        : {},
-    );
+    context = await browser.newContext(contextOptions(input.config, videoDir));
+    await installRequestGuard(context, input.config, metadata.targetUrl);
     page = await context.newPage();
     page.setDefaultTimeout(input.config.limits.navigationTimeoutMs);
     await page.goto(metadata.targetUrl, {
       waitUntil: "domcontentloaded",
       timeout: input.config.limits.navigationTimeoutMs,
     });
-    await installExternalRequestGuard(context, page.url());
 
     const initial = await captureEvidence("initial");
     actions.push({
@@ -194,7 +187,45 @@ async function closeBrowserBestEffort(browser: Browser | undefined, actions: Act
   }
 }
 
-export async function installExternalRequestGuard(context: BrowserContext, currentUrl: string): Promise<void> {
+export async function installRequestGuard(context: BrowserContext, config: UXAgentConfig, currentUrl: string): Promise<void> {
+  if (config.mode === "live" && config.live) {
+    const policy = createLivePolicy(config.live);
+    await context.routeWebSocket(/.*/, () => {
+      // Intentionally do not connect to the server. Playwright will mock the
+      // socket locally, preventing external ws/wss traffic from leaving live mode.
+    });
+    await context.route("**/*", async (route) => {
+      const requestUrl = route.request().url();
+      if (shouldBlockNetworkRequest(requestUrl, route.request().method(), policy)) {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      await route.continue();
+    });
+    return;
+  }
+
+  await installExternalRequestGuard(context, currentUrl);
+}
+
+function contextOptions(config: UXAgentConfig, videoDir: string): BrowserContextOptions {
+  return {
+    ...(config.limits.recordVideo
+      ? {
+          recordVideo: {
+            dir: videoDir,
+          },
+        }
+      : {}),
+    ...(config.mode === "live"
+      ? {
+          serviceWorkers: "block" as const,
+        }
+      : {}),
+  };
+}
+
+async function installExternalRequestGuard(context: BrowserContext, currentUrl: string): Promise<void> {
   if (!isSafeInteractionUrl(currentUrl)) {
     return;
   }
